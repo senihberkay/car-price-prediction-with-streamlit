@@ -1,6 +1,2 @@
-numpy>=1.9.2
-scikit-learn>=0.18
-pandas>=0.19
-streamlit==0.87.0
-feature-engine>=1.1 
-catboost==0.25.1
+scikit-learn==1.0.2
+streamlit==1.10.0
