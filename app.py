@@ -1,137 +1,48 @@
 import streamlit as st
-import numpy as np
 import pandas as pd
+import numpy as np
 import pickle
+import xgboost
 
-st.title("Let's Predict Used Car Prices!")
-
-@st.cache
-def get_df(filename):
-    df = pd.read_csv(filename)
-    return df
-
-
-df = get_df("final_scout_not_dummy.csv")
-
-left_column, mid_column, right_column = st.columns(3)
+html_temp = """
+<div style="background-color:tomato;padding:1.5px">
+<h2 style="color:white;text-align:center;">Used Car Price Prediction</h2>
+</div><br>"""
+st.markdown(html_temp,unsafe_allow_html=True)
 
 
-brand = left_column.selectbox(
-    "What is the Brand of your Car?",
-     df['brand'].unique()
-     )
+html_temp = """
+<div style="background-color:yellow;padding:1.5px">
+<h2 style="color:black;text-align:center;"> Arguments for the Prediction </h2>
+</div><br>"""
+st.sidebar.markdown(html_temp,unsafe_allow_html=True)
 
 
-model = mid_column.selectbox(
-    "What is the Model of your Car?",
-     df.query(f'brand == "{brand}"')['model'].unique()
-     )
+st.success("Please use the sidebar at left-hand-side to input the parameters of the price predictor")
+st.markdown("**And select the model of your car (from the left sidebar)**")
+st.markdown("**1-** Audi A3, **2-** Audi A1, **3-** Opel Insignia, **4-** Opel Astra, **5-** Opel Corsa")
+st.markdown("**6-** Renault Clio, **7-** Renault Espace, **8-** Renault Duster, **9-** Audi A2")
+make_model = st.sidebar.radio("Make & Model of Your Car:",(1,2,3,4,5,6,7,8,9))
 
 
-year = right_column.selectbox(
-    "What is the Model of your Car?",
-     df['year'].sort_values(ascending = False).unique()
-     )
+filename = 'xgboost_model.pkl'
+model = pickle.load(open(filename, 'rb'))
 
-fuel_type = df.query(f'model == "{model}"')['fuel_type'].unique()
-
-fuel = left_column.selectbox(
-    "Fuel Type",
-     fuel_type
-     )
-
-
-transmission = mid_column.selectbox(
-    "Car Transmission",
-     df['transmission'].unique()
-     )
+gears = st.sidebar.slider("The 'gear type' of your car:",min_value=1, max_value=7, value=5, step=1)
+age = st.sidebar.slider("The 'age' of your car:",min_value=1, max_value=50, value=3, step=1)
+hp = st.sidebar.slider("'Horse Power' of your car::",min_value=1, max_value=294, value=100, step=1)
+km = st.sidebar.slider("Kilometers travelled:",min_value=0, max_value=317000, value=10000, step=10)
+dict = {}
+dict["gears"] = gears
+dict["hp"] = hp
+dict["age"] = age
+dict["make_model"] = make_model
+dict["km"] = km
+df = pd.DataFrame.from_dict([dict])
+st.write(df)
 
 
-seats = right_column.selectbox(
-    "Seating Capacity",
-     df.query(f'model == "{model}"')['seats'].sort_values().unique()
-     )
+if st.button("Predict"):
+    pred = model.predict(df)
+    st.write(pred[0])
 
-
-owner = left_column.selectbox(
-    "Are you the Original Owner (First-Hand or Second-Hand) Car?",
-     df['is_first_owner'].unique()
-     )
-
-
-loc = mid_column.selectbox(
-    "Location",
-     df['location'].unique()
-    )
-
-distance = right_column.slider( 
-        "Total Distance Driven in Kilometers", 
-        min_value = 0, 
-        max_value = 750000, 
-        value = 1000, 
-        step = 100
-    )
-
-mileage_limit = df.query(f'model == "{model}"')['milage_kmpl']
-
-# print(mileage_limit.min())
-
-mileage = left_column.slider( 
-        "Mileage (km/l)", 
-        min_value = float(np.min(mileage_limit)-10.0), 
-        max_value = float(np.max(mileage_limit)+10.0), 
-        value = float(mileage_limit.mean()), 
-        step = float(0.1)
-    )
-
-
-engine_limit = df.query(f'model == "{model}"')['engine']
-
-
-engine = mid_column.slider( 
-        "Engine CC", 
-        min_value = int(engine_limit.min()-10), 
-        max_value = int(engine_limit.max()+10), 
-        value = int(engine_limit.min()), 
-        step = int(5)
-    )
-
-
-power_limit = df.query(f'model == "{model}"')['power']
-
-power = right_column.slider( 
-        "Brake Horse Power (BHP)", 
-        min_value = float(power_limit.min()-10.0), 
-        max_value = float(power_limit.max()+10.0), 
-        value = float(power_limit.mean()), 
-        step = float(0.1)
-    )
-
-
-cat_model = pickle.load(open('cat_pipe.pkl', 'rb'))
-
-
-features = pd.DataFrame({
-        "brand" : brand,
-        "model" : model, 
-        "milage_kmpl" : mileage,
-        "location" : loc, 
-        "year" : year, 
-        "kilometers_driven" : distance,
-        "fuel_type" : fuel, 
-        "transmission" : transmission,
-        "is_first_owner" : owner, 
-        "engine" : engine, 
-        "power" : power,
-        "seats" : seats
-    }, index=[0])
-
-
-prediction = cat_model.predict(features)[0]
-
-pressed = mid_column.button('Predict Car Price')
-
-if pressed:
-  st.subheader(f"This Car is predicted to cost around ₹ {prediction:,.0f}")
-  st.balloons()
-  
