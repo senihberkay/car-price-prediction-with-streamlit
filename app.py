@@ -1,48 +1,66 @@
+
 import streamlit as st
 import pandas as pd
 import numpy as np
 import pickle
-import xgboost
+from sklearn.linear_model import Lasso
+from sklearn.compose import make_column_transformer
+from sklearn.preprocessing import OneHotEncoder, MinMaxScaler
+from sklearn.pipeline import Pipeline
 
-html_temp = """
-<div style="background-color:tomato;padding:1.5px">
-<h2 style="color:white;text-align:center;">Used Car Price Prediction</h2>
-</div><br>"""
-st.markdown(html_temp,unsafe_allow_html=True)
+st.markdown("<h2 style='text-align:center; color:Black;'>Car Price Prediction</h2>", unsafe_allow_html=True)
+
+df = pd.read_csv("final_scout.csv")
+
+features = ["make_model", "hp_kW", "km","age", "Gearing_Type", "Gears","price"]
+df = df[features]
+
+if st.checkbox("Show Dataframe"):
+    st.write(df.head())
+
+X = df.drop(columns = ["price"])
+y = df.price
+
+cat = X.select_dtypes("object").columns
+cat = list(cat)
+
+column_trans = make_column_transformer((OneHotEncoder(handle_unknown="ignore", sparse=False), cat), 
+                                       remainder=MinMaxScaler())
+
+operations = [("OneHotEncoder", column_trans), ("Lasso", Lasso(alpha = 0.01))]
+pipe_model = Pipeline(steps=operations)
+pipe_model.fit(X, y)
+
+pickle.dump(pipe_model, open('autoscout_project.pkl', 'wb'))
+ 
+st.sidebar.title("Please select the features you want for price estimation")
+
+features = ["make_model", "hp_kW", "km","age", "Gearing_Type", "Gears","price"]
+
+def user_input_features() :
+    make_model = st.sidebar.selectbox("Make Model", ("Audi A3","Audi A1","Opel Insignia", "Opel Astra", "Opel Corsa", "Renault Clio", "Renault Espace", "Renault Duster"))
+    Gearing_Type = st.sidebar.selectbox("Gearing Type", ("Manual","Automatic", "Semi-automatic"))
+    age = st.sidebar.number_input("Age:",min_value=0, max_value=3)
+    Gears = st.sidebar.radio("Gears",(5,6,7,8))
+    hp_kW = st.sidebar.slider("Horse Power(kW)", df["hp_kW"].min(), df["hp_kW"].max(), float(df["hp_kW"].median()),1.0)
+    km = st.sidebar.slider("Kilometer(km)", df["km"].min(), df["km"].max(), float(df["km"].median()),1.0)
+    data = {"make_model" : make_model,
+            "Gearing_Type" : Gearing_Type,
+            "age" : age,
+            "hp_kW" : hp_kW,
+            "km" : km,
+            "Gears" : Gears}
+    features = pd.DataFrame(data, index=[0])
+    return features
 
 
-html_temp = """
-<div style="background-color:yellow;padding:1.5px">
-<h2 style="color:black;text-align:center;"> Arguments for the Prediction </h2>
-</div><br>"""
-st.sidebar.markdown(html_temp,unsafe_allow_html=True)
 
+input_df = user_input_features()
+st.success("Selected Features")
+st.write(input_df)
 
-st.success("Please use the sidebar at left-hand-side to input the parameters of the price predictor")
-st.markdown("**And select the model of your car (from the left sidebar)**")
-st.markdown("**1-** Audi A3, **2-** Audi A1, **3-** Opel Insignia, **4-** Opel Astra, **5-** Opel Corsa")
-st.markdown("**6-** Renault Clio, **7-** Renault Espace, **8-** Renault Duster, **9-** Audi A2")
-make_model = st.sidebar.radio("Make & Model of Your Car:",(1,2,3,4,5,6,7,8,9))
+model = pickle.load(open("final_model_scout.pkl", "rb"))
 
-
-filename = 'xgboost_model.pkl'
-model = pickle.load(open(filename, 'rb'))
-
-gears = st.sidebar.slider("The 'gear type' of your car:",min_value=1, max_value=7, value=5, step=1)
-age = st.sidebar.slider("The 'age' of your car:",min_value=1, max_value=50, value=3, step=1)
-hp = st.sidebar.slider("'Horse Power' of your car::",min_value=1, max_value=294, value=100, step=1)
-km = st.sidebar.slider("Kilometers travelled:",min_value=0, max_value=317000, value=10000, step=10)
-dict = {}
-dict["gears"] = gears
-dict["hp"] = hp
-dict["age"] = age
-dict["make_model"] = make_model
-dict["km"] = km
-df = pd.DataFrame.from_dict([dict])
-st.write(df)
-
-
-if st.button("Predict"):
-    pred = model.predict(df)
-    st.write(pred[0])
-
+#Apply model to make predictions
+if st.button('Make Prediction'):
+    st.success(f'Analyze Predict:&emsp;{model.predict(input_df)[0].round(2)}')
